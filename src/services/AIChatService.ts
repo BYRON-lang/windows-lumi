@@ -129,17 +129,17 @@ export class AIChatService {
     onComplete?: () => void
   ): Promise<void> {
     try {
-      console.log('🚀 Sending streaming message to public endpoint (no auth required)');
+      console.log('🚀 Sending message to API (using non-streaming endpoint as workaround)');
       console.log('📝 Request:', request);
       
-      const response = await fetch(`${this.baseUrl}/chat/stream`, {
+      // TEMPORARY: Use non-streaming endpoint until backend streaming is properly implemented
+      const response = await fetch(`${this.baseUrl}/chat`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       });
 
       console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -147,53 +147,25 @@ export class AIChatService {
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      if (!response.body) {
-        throw new Error('No response body');
-      }
+      // Get the full JSON response (non-streaming)
+      const data: ChatResponse = await response.json();
+      console.log('✅ Received response:', data);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            onComplete?.();
-            break;
-          }
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                
-                switch (data.type) {
-                  case 'thinking':
-                    onThinking?.(data.content);
-                    break;
-                  case 'content':
-                    onMessage(data.content);
-                    break;
-                  case 'error':
-                    onError?.(data.content);
-                    break;
-                  case 'end':
-                    onComplete?.();
-                    return;
-                }
-              } catch (e) {
-                // Skip malformed JSON
-                console.warn('Failed to parse SSE data:', line);
-              }
-            }
-          }
+      // Simulate streaming by sending the content in chunks
+      if (data.content) {
+        const content = data.content;
+        const chunkSize = 10; // Characters per chunk
+        
+        for (let i = 0; i < content.length; i += chunkSize) {
+          const chunk = content.slice(i, i + chunkSize);
+          onMessage(chunk);
+          // Small delay to simulate streaming
+          await new Promise(resolve => setTimeout(resolve, 20));
         }
-      } finally {
-        reader.releaseLock();
+        
+        onComplete?.();
+      } else {
+        throw new Error('No content in response');
       }
     } catch (error) {
       console.error('Streaming chat API error:', error);

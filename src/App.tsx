@@ -7,6 +7,7 @@ import ChatHistoryPage from './pages/ChatHistoryPage';
 import GoalsPage from './pages/GoalsPage';
 import RemindersPage from './pages/RemindersPage';
 import NotesPage from './pages/NotesPage';
+import EditorPage from './pages/EditorPage';
 import { useAuthService } from './services/authService';
 import logoImage from './logo/logo.png';
 
@@ -358,6 +359,7 @@ export default function App() {
         <Route path="/goals" element={<GoalsPage />} />
         <Route path="/reminders" element={<RemindersPage />} />
         <Route path="/notes" element={<NotesPage />} />
+        <Route path="/editor" element={<EditorPage />} />
       </Routes>
     </Router>
   );

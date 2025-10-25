@@ -2,12 +2,14 @@ import * as React from 'react';
 import TopBar from '../components/TopBar';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
+import NewNotes from '../components/NewNotes';
 
 const NotesPage: React.FC = () => {
   const [collapsed, setCollapsed] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<'all' | 'recent'>('all');
   const [showSearch, setShowSearch] = React.useState(false);
   const [searchText, setSearchText] = React.useState('');
+  const [showNewNotes, setShowNewNotes] = React.useState(false);
 
   return (
     <div style={{
@@ -17,7 +19,7 @@ const NotesPage: React.FC = () => {
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      padding: '0'
+      padding: '0',
     }}>
       <TopBar background="#202020" borderBottom="1px solid #2a2a2a" hideBorderLeftPx={collapsed ? 0 : 230} onToggleSidebar={setCollapsed} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'row', padding: '0' }}>
@@ -169,6 +171,7 @@ const NotesPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setShowNewNotes(true)}
                   style={{
                     marginLeft: '12px',
                     padding: '6px 12px',
@@ -202,6 +205,7 @@ const NotesPage: React.FC = () => {
           </div>
         </div>
       </div>
+      <NewNotes isOpen={showNewNotes} onClose={() => setShowNewNotes(false)} />
     </div>
   );
 };

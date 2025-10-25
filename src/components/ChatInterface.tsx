@@ -22,7 +22,10 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
   const [isStreaming, setIsStreaming] = React.useState(false);
   const [streamingContent, setStreamingContent] = React.useState('');
   const [thinkingContent, setThinkingContent] = React.useState('');
+  const [headerVisible, setHeaderVisible] = React.useState(true);
   const { sendStreamingMessage, generateTitle, isLoading, error } = useAIChat();
+  const initialMessageProcessedRef = React.useRef(false);
+  const messagesContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Test API connection on component mount
   React.useEffect(() => {
@@ -45,7 +48,10 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
 
   // Initialize with initial message if provided
   React.useEffect(() => {
-    if (initialMessage) {
+    if (initialMessage && initialMessage.trim() && !initialMessageProcessedRef.current) {
+      console.log('📨 Initial message provided:', initialMessage);
+      initialMessageProcessedRef.current = true;
+      
       const userMessage: Message = {
         id: Date.now().toString(),
         content: initialMessage,
@@ -53,7 +59,85 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
         timestamp: new Date()
       };
       setMessages([userMessage]);
+      
+      // Trigger AI response for initial message
+      const processInitialMessage = async () => {
+        console.log('🔄 Processing initial message with AI...');
+        setIsStreaming(true);
+        setStreamingContent('');
+        setThinkingContent('');
+        
+        let accumulatedContent = '';
+        
+        try {
+          await sendStreamingMessage(
+            {
+              message: initialMessage.trim(),
+              conversationHistory: [] // Empty history for first message
+            },
+            // onMessage
+            (content: string) => {
+              console.log('📝 Received content chunk:', content);
+              accumulatedContent += content;
+              setStreamingContent(prev => prev + content);
+            },
+            // onThinking
+            (thinking: string) => {
+              console.log('🧠 Received thinking:', thinking);
+              setThinkingContent(thinking);
+            },
+            // onError
+            (error: string) => {
+              console.error('❌ AI streaming error:', error);
+              const errorMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                content: `Sorry, I encountered an error: ${error}`,
+                isUser: false,
+                timestamp: new Date()
+              };
+              setMessages(prev => [...prev, errorMessage]);
+              setIsStreaming(false);
+              setStreamingContent('');
+              setThinkingContent('');
+            },
+            // onComplete
+            () => {
+              console.log('✅ Initial message streaming completed. Content:', accumulatedContent);
+              if (accumulatedContent.trim()) {
+                const aiMessage: Message = {
+                  id: (Date.now() + 1).toString(),
+                  content: accumulatedContent.trim(),
+                  isUser: false,
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, aiMessage]);
+                console.log('✅ AI response added to messages:', aiMessage);
+              } else {
+                console.warn('⚠️ No content accumulated during initial message streaming');
+              }
+              setIsStreaming(false);
+              setStreamingContent('');
+              setThinkingContent('');
+            }
+          );
+        } catch (error) {
+          console.error('💥 Failed to process initial message:', error);
+          const errorMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            content: 'Sorry, I was unable to process your message. Please try again.',
+            isUser: false,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          setIsStreaming(false);
+          setStreamingContent('');
+          setThinkingContent('');
+        }
+      };
+      
+      processInitialMessage();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage]);
 
   const handleMessageSent = async (message: string) => {
@@ -85,6 +169,9 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
     
     console.log('🔄 Starting AI streaming...');
 
+    // Use a ref to accumulate the complete response content
+    let accumulatedContent = '';
+
     try {
       await sendStreamingMessage(
         {
@@ -93,7 +180,8 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
         },
         // onMessage - handle streaming content
         (content: string) => {
-          console.log('📝 Received content:', content);
+          console.log('📝 Received content chunk:', content);
+          accumulatedContent += content;
           setStreamingContent(prev => prev + content);
         },
         // onThinking - handle thinking process
@@ -111,18 +199,24 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
             timestamp: new Date()
           };
           setMessages(prev => [...prev, errorMessage]);
+          setIsStreaming(false);
+          setStreamingContent('');
+          setThinkingContent('');
         },
         // onComplete - finalize the response
         () => {
-          console.log('✅ Streaming completed');
-          if (streamingContent.trim()) {
+          console.log('✅ Streaming completed. Accumulated content:', accumulatedContent);
+          if (accumulatedContent.trim()) {
             const aiMessage: Message = {
               id: (Date.now() + 1).toString(),
-              content: streamingContent.trim(),
+              content: accumulatedContent.trim(),
               isUser: false,
               timestamp: new Date()
             };
             setMessages(prev => [...prev, aiMessage]);
+            console.log('✅ AI message added to messages:', aiMessage);
+          } else {
+            console.warn('⚠️ No content accumulated during streaming');
           }
           setIsStreaming(false);
           setStreamingContent('');
@@ -168,28 +262,31 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
           }
         `}
       </style>
-      <div style={{
-        position: 'fixed',
-        top: '60px',
-        left: '250px',
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'transparent',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden', // Prevent any overflow that could cause bottom scroll
-        overflowX: 'hidden', // Specifically prevent horizontal scroll
-        maxWidth: 'calc(100vw - 250px)', // Ensure it doesn't exceed viewport width minus sidebar
-        width: 'calc(100vw - 250px)' // Set explicit width
-      }}>
+       <div style={{
+         position: 'fixed',
+         top: '60px',
+         left: '250px',
+         right: 0,
+         bottom: 0,
+         backgroundColor: 'transparent',
+         display: 'flex',
+         flexDirection: 'column',
+         overflow: 'hidden',
+         overflowX: 'hidden',
+         maxWidth: 'calc(100vw - 250px)',
+         width: 'calc(100vw - 250px)',
+         height: 'calc(100vh - 60px)'
+       }}>
       {/* Chat Title Header */}
       <div style={{
-        height: '60px',
-        padding: '0 16px',
+        height: '32px',
+        padding: '0 16px 0px 16px', // Removed bottom padding completely
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        flexShrink: 0
+        flexShrink: 0,
+        marginTop: 0,
+        backgroundColor: 'transparent'
       }}>
         <div style={{
           display: 'inline-flex',
@@ -197,7 +294,7 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
           gap: '8px',
           padding: '6px 12px',
           backgroundColor: 'transparent',
-          borderRadius: '9999px',
+          borderRadius: '6px',
           border: '1px solid transparent',
           cursor: 'pointer',
           transition: 'all 0.2s ease'
@@ -227,11 +324,11 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
           <span style={{
             color: '#ffffff',
             fontSize: '14px',
-            fontWeight: 'normal',
+            fontWeight: '500',
             margin: 0,
             padding: 0
           }}>
-            Lumi AI / {chatTitle}
+            Lumi AI {chatTitle ? `/ ${chatTitle}` : ''}
           </span>
         </div>
         
@@ -246,10 +343,11 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: '9999px',
+            borderRadius: '6px',
             backgroundColor: '#2a2a2a',
             border: '1px solid #333',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
           }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
@@ -263,7 +361,7 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
         flex: 1,
         display: 'flex',
         justifyContent: 'center',
-        padding: '0 16px',
+        padding: '8px 16px 0 16px',
         overflow: 'hidden'
       }}>
         <MessagesInterface 
@@ -280,7 +378,7 @@ export default function ChatInterface({ chatTitle, initialMessage, onMessageSent
         height: '140px', // Increased to accommodate ChatInput minHeight of 110px
         display: 'flex',
         justifyContent: 'center',
-        padding: '16px 16px 40px 16px', // Increased bottom margin
+        padding: '0 16px 40px 16px', // Removed top padding
         flexShrink: 0
       }}>
         <ChatInput onMessageSent={(message) => {

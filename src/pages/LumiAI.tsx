@@ -64,17 +64,11 @@ export default function LumiAI() {
   const handleMessageSent = async (message: string) => {
     console.log('Message sent:', message);
     
-    // Use AI service to generate title
-    try {
-      const title = await generateTitle(message);
-      setChatTitle(title);
-    } catch (error) {
-      console.error('Failed to generate title:', error);
-      // Fallback to local title generation
-      const fallbackTitle = generateChatTitle(message);
-      setChatTitle(fallbackTitle);
-    }
+    // Use local title generation (API returns generic titles)
+    const title = generateChatTitle(message);
+    setChatTitle(title);
     
+    // Set initial message and transition to chat
     setInitialMessage(message);
     setIsInChat(true);
   };
